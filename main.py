@@ -81,9 +81,11 @@ def test(args, model, device, test_loader):
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
+    acy = 1.0 * correct / len(test_loader.dataset)
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+        100. * acy))
+    return acy
 
 def train_student_batch(args, teacher_model, student_model, discriminator, device, train_loader, optimizer, epoch):
     teacher_model.train()
@@ -217,10 +219,15 @@ def main():
     print(discriminator)
     print(optimizer)
 
+    best_student_acy = -1.0
     for epoch in range(1, args.epochs + 1):
         train_student_parallel(args, teacher_model, student_model, discriminator, device, train_loader, optimizer, epoch)
         test(args, teacher_model, device, test_loader)
-        test(args, student_model, device, test_loader)
+        acy = test(args, student_model, device, test_loader)
+        
+        if(best_student_acy < acy):
+            best_student_acy = acy
+        print('Best Student Test Accuracy: {:.2f}%'.format(100.0 * best_student_acy))
 
 
 
