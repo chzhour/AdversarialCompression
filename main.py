@@ -25,7 +25,10 @@ class Net(nn.Module):
         #return F.log_softmax(x, dim=1)
         return x
 
-class Discriminator(nn.Module):#input - 200 - 100 - 2
+class Discriminator(nn.Module):
+    #first:     input - 200 - 100 - 2
+    #deeperD:   input - 400 - 400 - 100 - 2
+    #deeperD2:  input - 400 - 400 - 400 - 400 - 2
     def __init__(self):
         super(Discriminator, self).__init__()
         self.operation = nn.Sequential( nn.Linear(21, 400), #10+1
@@ -36,11 +39,15 @@ class Discriminator(nn.Module):#input - 200 - 100 - 2
                                         nn.ReLU(),
                                         nn.Dropout(),
                                         
-                                        nn.Linear(400, 100),
+                                        nn.Linear(400, 400),
                                         nn.ReLU(),
                                         nn.Dropout(),
 
-                                        nn.Linear(100, 2)   )
+                                        nn.Linear(400, 400),
+                                        nn.ReLU(),
+                                        nn.Dropout(),
+
+                                        nn.Linear(400, 2)   )
 
     def forward(self, x):
         x = self.operation(x)
