@@ -122,24 +122,25 @@ def train_student_parallel(args, teacher_model, student_model, discriminator, de
     discriminator.train()
     for batch_idx, (data, c_target) in enumerate(train_loader):
         data, c_target = data.to(device), c_target.to(device)
-        rand_permute = torch.randperm(data.size()[0]).to(device)
-        data, c_target = data[rand_permute], c_target[rand_permute]
+        #rand_permute = torch.randperm(data.size()[0]).to(device)
+        #data, c_target = data[rand_permute], c_target[rand_permute]
         optimizer.zero_grad()
 
         with torch.no_grad():
             teacher_output = teacher_model(data) 
         student_output = student_model(data)
-        assert(data.size()[0]%2==0)
-        half_idx = int(data.size()[0]/2)
+        #assert(data.size()[0]%2==0)
+        #half_idx = int(data.size()[0]/2)
 
-        classifier_output = torch.cat((teacher_output[:half_idx], student_output[:half_idx]), dim=1) #tensor
+        classifier_output = torch.cat((teacher_output, student_output), dim=1) #tensor
         classifier_output = (classifier_output, 
-                            torch.cat((student_output[half_idx:], teacher_output[half_idx:]), dim=1) ) #tuple
+                            torch.cat((student_output, teacher_output), dim=1) ) #tuple
         classifier_output = torch.cat(classifier_output, dim=0) #tensor
         c_target = c_target.float().unsqueeze_(dim=1)*1.0 #int64 to float32, (size) to (size, 1)
+        c_target = torch.cat((c_target, c_target), dim=0) #duplicated
         classifier_output = torch.cat((classifier_output, c_target), dim=1)
 
-        d_target = (torch.zeros(half_idx, dtype=torch.int64), torch.ones(half_idx, dtype=torch.int64))
+        d_target = (torch.zeros(data.size()[0], dtype=torch.int64), torch.ones(data.size()[0], dtype=torch.int64))
         d_target = torch.cat(d_target, dim=0).to(device)
 
         d_output = discriminator(classifier_output)
@@ -174,6 +175,8 @@ def main():
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
     args = parser.parse_args()
+    print(args)
+
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
     torch.manual_seed(args.seed)
@@ -198,6 +201,8 @@ def main():
 
     teacher_model = Net().to(device)
     optimizer = optim.SGD(teacher_model.parameters(), lr=0.01, momentum=args.momentum)
+    print(teacher_model)
+    print(optimizer)
 
     for epoch in range(1, 11):
         train_teacher(args, teacher_model, device, train_loader, optimizer, epoch)
@@ -208,6 +213,9 @@ def main():
     discriminator = Discriminator().to(device)
     discriminator.operation[0].register_backward_hook(reverse_grad_hook)
     optimizer = optim.SGD(list(student_model.parameters()) + list(discriminator.parameters()), lr=args.lr, momentum=args.momentum)
+    print(student_model)
+    print(discriminator)
+    print(optimizer)
 
     for epoch in range(1, args.epochs + 1):
         train_student_parallel(args, teacher_model, student_model, discriminator, device, train_loader, optimizer, epoch)
