@@ -32,4 +32,5 @@ visualize('/Users/chen/Documents/Dropbox/github/AdversarialCompression/parallel_
 visualize('/Users/chen/Desktop/parallel_0.01_deeperD_shuffledata.txt', 'blue')
 visualize('/Users/chen/Desktop/parallel_0.01_deeperD_duplicatedata.txt', 'green')
 visualize('/Users/chen/Desktop/parallel_0.01_deeperD2_duplicatedata.txt', 'black')
+visualize('/Users/chen/Desktop/parallel_deeperD2_shuffledata.txt', 'pink')
 pyplot.show()

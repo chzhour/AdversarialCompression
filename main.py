@@ -18,12 +18,12 @@ class Net(nn.Module):
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, 320)
+        x = features = x.view(-1, 320)
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
         #return F.log_softmax(x, dim=1)
-        return x
+        return x, features 
 
 class Discriminator(nn.Module):
     #first:     input - 200 - 100 - 2
@@ -31,15 +31,7 @@ class Discriminator(nn.Module):
     #deeperD2:  input - 400 - 400 - 400 - 400 - 2
     def __init__(self):
         super(Discriminator, self).__init__()
-        self.operation = nn.Sequential( nn.Linear(21, 400), #10+1
-                                        nn.ReLU(),
-                                        nn.Dropout(),
-
-                                        nn.Linear(400, 400),
-                                        nn.ReLU(),
-                                        nn.Dropout(),
-                                        
-                                        nn.Linear(400, 400),
+        self.operation = nn.Sequential( nn.Linear(20 + 320 + 1, 400), #10+1
                                         nn.ReLU(),
                                         nn.Dropout(),
 
@@ -47,7 +39,11 @@ class Discriminator(nn.Module):
                                         nn.ReLU(),
                                         nn.Dropout(),
 
-                                        nn.Linear(400, 2)   )
+                                        nn.Linear(400, 100),
+                                        nn.ReLU(),
+                                        nn.Dropout(),
+
+                                        nn.Linear(100, 2)   )
 
     def forward(self, x):
         x = self.operation(x)
@@ -55,7 +51,7 @@ class Discriminator(nn.Module):
 
 def reverse_grad_hook(self, grad_input, grad_output):
     assert(len(grad_input) == 3)
-    assert(grad_input[1].size()[1] == 21)#10+1
+    #assert(grad_input[1].size()[1] == 21)#10+1
 
     return grad_input[0]*1, grad_input[1]*-1, grad_input[2]*1
 
@@ -64,7 +60,7 @@ def train_teacher(args, model, device, train_loader, optimizer, epoch):
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-        output = model(data)
+        output, _ = model(data)
         #loss = F.nll_loss(output, target)
         loss = F.cross_entropy(output, target)
         loss.backward()
@@ -81,7 +77,7 @@ def test(args, model, device, test_loader):
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            output = model(data)
+            output, _ = model(data)
             #test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
             test_loss += F.cross_entropy(output, target, size_average=False).item() # sum up batch loss
             pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
@@ -136,14 +132,14 @@ def train_student_parallel(args, teacher_model, student_model, discriminator, de
         optimizer.zero_grad()
 
         with torch.no_grad():
-            teacher_output = teacher_model(data) 
-        student_output = student_model(data)
+            teacher_output, teacher_features = teacher_model(data) 
+        student_output, _ = student_model(data)
         assert(data.size()[0]%2==0)
         half_idx = int(data.size()[0]/2)
 
-        classifier_output = torch.cat((teacher_output[:half_idx], student_output[:half_idx]), dim=1) #tensor
+        classifier_output = torch.cat((teacher_output[:half_idx], student_output[:half_idx], teacher_features[:half_idx]), dim=1) #tensor
         classifier_output = (classifier_output, 
-                            torch.cat((student_output[half_idx:], teacher_output[half_idx:]), dim=1) ) #tuple
+                            torch.cat((student_output[half_idx:], teacher_output[half_idx:], teacher_features[half_idx:]), dim=1) ) #tuple
         classifier_output = torch.cat(classifier_output, dim=0) #tensor
         c_target = c_target.float().unsqueeze_(dim=1)*1.0 #int64 to float32, (size) to (size, 1)
         classifier_output = torch.cat((classifier_output, c_target), dim=1)
