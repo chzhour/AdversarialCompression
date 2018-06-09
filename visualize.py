@@ -19,7 +19,9 @@ def visualize(filename, color):
 			elif start and line.startswith("Test set:"):
 				count += 1
 				if count == 1:
-					print(filename + "\t\tTeacher: {:.2f} \t\tStudent: ".format(extract_acy(line)), end=' ')
+					print(filename + " " + color + 
+							"\t\tTeacher: {:.2f} \t\tStudent: ".format(extract_acy(line)), 
+							end=' ')
 				elif count%2 == 0:
 					accuracies.append( extract_acy(line) )
 
@@ -28,9 +30,9 @@ def visualize(filename, color):
 	pyplot.plot(accuracies, color)
 
 
-visualize('/Users/chen/Documents/Dropbox/github/AdversarialCompression/parallel_deeperD.txt', 'red')
-visualize('/Users/chen/Desktop/parallel_0.01_deeperD_shuffledata.txt', 'blue')
-visualize('/Users/chen/Desktop/parallel_0.01_deeperD_duplicatedata.txt', 'green')
-visualize('/Users/chen/Desktop/parallel_0.01_deeperD2_duplicatedata.txt', 'black')
-visualize('/Users/chen/Desktop/parallel_deeperD2_shuffledata.txt', 'pink')
+visualize('/Users/chen/Desktop/parallel_features_deeperD_shuffledata.txt', 'red')
+visualize('/Users/chen/Documents/Dropbox alias/AdversarialCompression/parallel_deeperD_shuffledata.txt', 'blue')
+visualize('/Users/chen/Desktop/parallel_features_shuffledata.txt', 'green')
+#visualize('/Users/chen/Desktop/parallel_0.01_deeperD2_duplicatedata.txt', 'black')
+#visualize('/Users/chen/Desktop/parallel_deeperD2_shuffledata.txt', 'pink')
 pyplot.show()

@@ -27,7 +27,7 @@ class Net(nn.Module):
 
 class Discriminator(nn.Module):
     #first:     input - 200 - 100 - 2
-    #deeperD:   input - 400 - 400 - 100 - 2
+    #deeperD:   input - 400 - 400 - 100 - 2, good in most cases
     #deeperD2:  input - 400 - 400 - 400 - 400 - 2
     def __init__(self):
         super(Discriminator, self).__init__()
@@ -99,9 +99,13 @@ def train_student_batch(args, teacher_model, student_model, discriminator, devic
         optimizer.zero_grad()
 
         with torch.no_grad():
-            classifier_output = teacher_model(data) #tensor
-        classifier_output = (classifier_output, student_model(data)) #tuple
-        classifier_output = torch.cat(classifier_output, dim=0) #tensor
+            teacher_output, teacher_features = teacher_model(data)
+        student_output, _ = student_model(data)
+
+        classifier_output = torch.cat((teacher_output, student_output), dim=0) #tensor
+        classifier_output = (classifier_output,
+                            torch.cat((teacher_features, teacher_features), dim=0)) #tuple
+        classifier_output = torch.cat(classifier_output, dim=1) #tensor
         c_target = c_target.float().unsqueeze_(dim=1)*1.0 # int64 to float32, (size) to (size, 1)
         c_target = torch.cat((c_target, c_target), dim=0) #duplicated tensor
         classifier_output = torch.cat((classifier_output, c_target), dim=1)
