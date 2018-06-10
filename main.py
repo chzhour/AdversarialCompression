@@ -23,6 +23,7 @@ class Net(nn.Module):
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
         #return F.log_softmax(x, dim=1)
+        #feature = F.dropout(features, training=self.training) #dropout????
         return x, features 
 
 class Discriminator(nn.Module):
@@ -125,7 +126,8 @@ def train_student_batch(args, teacher_model, student_model, discriminator, devic
             print('Accuracy of D: {:.2f}%'.format( 
                     100.0* (d_output.max(dim=1)[1] == d_target).sum().item() / d_target.size()[0] ))
 
-def train_student_parallel(args, teacher_model, student_model, discriminator, device, train_loader, optimizer, epoch):
+def train_student_parallel(args, teacher_model, student_model, discriminator, device, train_loader, 
+                            optimizer_student, optimizer_discriminator, epoch):
     teacher_model.train()
     student_model.train()
     discriminator.train()
@@ -133,7 +135,8 @@ def train_student_parallel(args, teacher_model, student_model, discriminator, de
         data, c_target = data.to(device), c_target.to(device)
         rand_permute = torch.randperm(data.size()[0]).to(device)
         data, c_target = data[rand_permute], c_target[rand_permute]
-        optimizer.zero_grad()
+        optimizer_student.zero_grad()
+        optimizer_discriminator.zero_grad()
 
         with torch.no_grad():
             teacher_output, teacher_features = teacher_model(data) 
@@ -154,7 +157,9 @@ def train_student_parallel(args, teacher_model, student_model, discriminator, de
         d_output = discriminator(classifier_output)
         loss = F.nll_loss(d_output, d_target)
         loss.backward()
-        optimizer.step()
+        optimizer_student.step()
+        if torch.rand(1).item() < 0.5:
+            optimizer_discriminator.step()
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
@@ -220,14 +225,19 @@ def main():
     student_model = Net().to(device)
     discriminator = Discriminator().to(device)
     discriminator.operation[0].register_backward_hook(reverse_grad_hook)
-    optimizer = optim.SGD(list(student_model.parameters()) + list(discriminator.parameters()), lr=args.lr, momentum=args.momentum)
+    #optimizer = optim.SGD(list(student_model.parameters()) + list(discriminator.parameters()), lr=args.lr, momentum=args.momentum)
+    optimizer_student = optim.SGD(student_model.parameters(), lr=args.lr, momentum=args.momentum)
+    optimizer_discriminator = optim.SGD(discriminator.parameters(), lr=args.lr, momentum=args.momentum)
     print(student_model)
     print(discriminator)
-    print(optimizer)
+    #print(optimizer)
+    print(optimizer_student)
+    print(optimizer_discriminator)
 
     best_student_acy = -1.0
     for epoch in range(1, args.epochs + 1):
-        train_student_parallel(args, teacher_model, student_model, discriminator, device, train_loader, optimizer, epoch)
+        train_student_parallel(args, teacher_model, student_model, discriminator, device, train_loader, 
+                                optimizer_student, optimizer_discriminator, epoch)
         test(args, teacher_model, device, test_loader)
         acy = test(args, student_model, device, test_loader)
         
