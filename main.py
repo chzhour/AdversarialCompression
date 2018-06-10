@@ -16,15 +16,15 @@ class Net(nn.Module):
         self.fc2 = nn.Linear(50, 10)
 
     def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        x = features = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = features = x.view(-1, 320)
+        x = x.view(-1, 320)
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
         #return F.log_softmax(x, dim=1)
         #feature = F.dropout(features, training=self.training) #dropout????
-        return x, features 
+        return x, features.view(x.size()[0], -1)
 
 class Discriminator(nn.Module):
     #first:     input - 200 - 100 - 2
@@ -32,7 +32,7 @@ class Discriminator(nn.Module):
     #deeperD2:  input - 400 - 400 - 400 - 400 - 2
     def __init__(self):
         super(Discriminator, self).__init__()
-        self.operation = nn.Sequential( nn.Linear(20 + 320 + 1, 400), #10+1
+        self.operation = nn.Sequential( nn.Linear(20 + 1440 + 1, 400), #10+1
                                         nn.ReLU(),
                                         nn.Dropout(),
 
@@ -158,8 +158,8 @@ def train_student_parallel(args, teacher_model, student_model, discriminator, de
         loss = F.nll_loss(d_output, d_target)
         loss.backward()
         optimizer_student.step()
-        if torch.rand(1).item() < 0.5:
-            optimizer_discriminator.step()
+        #if torch.rand(1).item() < 0.5:
+        optimizer_discriminator.step()
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),

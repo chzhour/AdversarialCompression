@@ -32,7 +32,7 @@ def visualize(filename, color):
 
 visualize('/Users/chen/Desktop/parallel_features_deeperD_shuffledata.txt', 'red')
 visualize('/Users/chen/Documents/Dropbox alias/AdversarialCompression/parallel_deeperD_shuffledata.txt', 'blue')
-visualize('/Users/chen/Desktop/parallel_features_shuffledata.txt', 'green')
+visualize('/Users/chen/Desktop/parallel_featuresconv1_deeperD_shuffledata.txt', 'green')
 #visualize('/Users/chen/Desktop/parallel_0.01_deeperD2_duplicatedata.txt', 'black')
 #visualize('/Users/chen/Desktop/parallel_deeperD2_shuffledata.txt', 'pink')
 pyplot.show()
