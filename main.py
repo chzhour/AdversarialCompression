@@ -32,7 +32,13 @@ class Discriminator(nn.Module):
     #deeperD2:  input - 400 - 400 - 400 - 400 - 2
     def __init__(self):
         super(Discriminator, self).__init__()
-        self.operation = nn.Sequential( nn.Linear(20 + 1440 + 1, 400), #10+1
+        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
+        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
+        self.conv2_drop = nn.Dropout2d()
+        self.fc1 = nn.Linear(320, 100)
+        self.fc2 = nn.Linear(100, 100)
+
+        self.operation = nn.Sequential( nn.Linear(20 + 100 + 1, 400), #10+1
                                         nn.ReLU(),
                                         nn.Dropout(),
 
@@ -46,15 +52,21 @@ class Discriminator(nn.Module):
 
                                         nn.Linear(100, 2)   )
 
-    def forward(self, x):
+    def forward(self, x, images):
+        images = F.relu(F.max_pool2d(self.conv1(images), 2))
+        images = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(images)), 2))
+        images = images.view(-1, 320)
+        images = F.relu(self.fc1(images))
+        images = F.dropout(images, training=self.training)
+        images = self.fc2(images)
+        x = torch.cat((images, x), dim=1)
+
         x = self.operation(x)
         return F.log_softmax(x, dim=1)
 
 def reverse_grad_hook(self, grad_input, grad_output):
     assert(len(grad_input) == 3)
-    #assert(grad_input[1].size()[1] == 21)#10+1
-
-    return grad_input[0]*1, grad_input[1]*-1, grad_input[2]*1
+    return grad_input[0]*-1, grad_input[1]*-1, grad_input[2]*-1
 
 def train_teacher(args, model, device, train_loader, optimizer, epoch):
     model.train()
@@ -144,9 +156,9 @@ def train_student_parallel(args, teacher_model, student_model, discriminator, de
         assert(data.size()[0]%2==0)
         half_idx = int(data.size()[0]/2)
 
-        classifier_output = torch.cat((teacher_output[:half_idx], student_output[:half_idx], teacher_features[:half_idx]), dim=1) #tensor
+        classifier_output = torch.cat((teacher_output[:half_idx], student_output[:half_idx]), dim=1) #tensor
         classifier_output = (classifier_output, 
-                            torch.cat((student_output[half_idx:], teacher_output[half_idx:], teacher_features[half_idx:]), dim=1) ) #tuple
+                            torch.cat((student_output[half_idx:], teacher_output[half_idx:]), dim=1) ) #tuple
         classifier_output = torch.cat(classifier_output, dim=0) #tensor
         c_target = c_target.float().unsqueeze_(dim=1)*1.0 #int64 to float32, (size) to (size, 1)
         classifier_output = torch.cat((classifier_output, c_target), dim=1)
@@ -154,7 +166,7 @@ def train_student_parallel(args, teacher_model, student_model, discriminator, de
         d_target = (torch.zeros(half_idx, dtype=torch.int64), torch.ones(half_idx, dtype=torch.int64))
         d_target = torch.cat(d_target, dim=0).to(device)
 
-        d_output = discriminator(classifier_output)
+        d_output = discriminator(classifier_output, data)
         loss = F.nll_loss(d_output, d_target)
         loss.backward()
         optimizer_student.step()
@@ -223,8 +235,8 @@ def main():
 
     ##################################################################
     student_model = Net().to(device)
+    student_model.fc2.register_backward_hook(reverse_grad_hook)
     discriminator = Discriminator().to(device)
-    discriminator.operation[0].register_backward_hook(reverse_grad_hook)
     #optimizer = optim.SGD(list(student_model.parameters()) + list(discriminator.parameters()), lr=args.lr, momentum=args.momentum)
     optimizer_student = optim.SGD(student_model.parameters(), lr=args.lr, momentum=args.momentum)
     optimizer_discriminator = optim.SGD(discriminator.parameters(), lr=args.lr, momentum=args.momentum)
